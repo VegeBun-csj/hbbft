@@ -5,7 +5,7 @@ use std::sync::Arc;
 use derivative::Derivative;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{Deserialize};
 
 use super::epoch_state::EpochState;
 use super::{Batch, Error, FaultKind, HoneyBadgerBuilder, Message, Result};

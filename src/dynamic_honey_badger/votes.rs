@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::crypto::Signature;
 use bincode;
 use serde::Serialize;
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{Deserialize};
 
 use super::{Change, Error, FaultKind, Result};
 use crate::fault_log;

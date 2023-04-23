@@ -11,7 +11,7 @@ use bincode;
 use log::error;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{Deserialize};
 
 use super::{Batch, Error, FaultKind, FaultLog, MessageContent, Result, Step};
 use crate::fault_log::Fault;
