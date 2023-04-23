@@ -51,7 +51,7 @@ impl<N: Ord> Target<N> {
 }
 
 /// Message with a designated target.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TargetedMessage<M, N> {
     /// The node or nodes that this message must be delivered to.
     pub target: Target<N>,

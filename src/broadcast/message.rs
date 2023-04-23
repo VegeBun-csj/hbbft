@@ -9,7 +9,7 @@ use super::merkle::{Digest, MerkleTree, Proof};
 
 /// The three kinds of message sent during the reliable broadcast stage of the
 /// consensus algorithm.
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Message {
     /// A share of the value, sent from the sender to another validator.
     Value(Proof<Vec<u8>>),

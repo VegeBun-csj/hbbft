@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use crate::crypto::{self, PublicKeySet, PublicKeyShare, SecretKeyShare};
-use rand;
 
 use crate::{util, NodeIdT};
 

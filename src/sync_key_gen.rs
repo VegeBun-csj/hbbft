@@ -178,7 +178,8 @@ use std::string::ToString;
 use std::sync::Arc;
 
 use bincode;
-use failure::Fail;
+use thiserror::Error;
+
 use rand::{self, Rng};
 use serde::{Deserialize, Serialize};
 
@@ -187,10 +188,11 @@ use crate::crypto::{
     error::Error as CryptoError,
     poly::{BivarCommitment, BivarPoly, Poly},
     serde_impl::FieldWrap,
-    Fr, G1Affine, PublicKeySet, SecretKeyShare,
+    G1Affine, PublicKeySet, Scalar, SecretKeyShare,
 };
-use crate::pairing::{CurveAffine, Field};
 use crate::NodeIdT;
+use std::ops::AddAssign;
+use std::ops::Mul;
 
 /// A cryptographic key that allows decrypting messages that were encrypted to the key's owner.
 pub trait SecretKey {
@@ -251,22 +253,22 @@ where
 
 /// A local error while handling an `Ack` or `Part` message, that was not caused by that message
 /// being invalid.
-#[derive(Clone, Eq, PartialEq, Debug, Fail)]
+#[derive(Clone, Eq, PartialEq, Debug, Error)]
 pub enum Error {
     /// Error creating `SyncKeyGen`.
-    #[fail(display = "Error creating SyncKeyGen: {}", _0)]
+    #[error("Error creating SyncKeyGen: {0}")]
     Creation(CryptoError),
     /// Error generating keys.
-    #[fail(display = "Error generating keys: {}", _0)]
+    #[error("Error generating keys: {0}")]
     Generation(CryptoError),
     /// Unknown sender.
-    #[fail(display = "Unknown sender")]
+    #[error("Unknown sender")]
     UnknownSender,
     /// Failed to serialize message.
-    #[fail(display = "Serialization error: {}", _0)]
+    #[error("Serialization error: {0}")]
     Serialize(String),
     /// Failed to encrypt message parts for a peer.
-    #[fail(display = "Encryption error: {}", _0)]
+    #[error("Encryption error: {0}")]
     Encrypt(String),
 }
 
@@ -323,7 +325,7 @@ struct ProposalState {
     /// The proposer's commitment.
     commit: BivarCommitment,
     /// The verified values we received from `Ack` messages.
-    values: BTreeMap<u64, Fr>,
+    values: BTreeMap<u64, Scalar>,
     /// The nodes which have acked this part, valid or not.
     acks: BTreeSet<u64>,
 }
@@ -515,7 +517,7 @@ impl<N: NodeIdT, PK: PublicKey> SyncKeyGen<N, PK> {
     /// messages before calling this method. Otherwise their key shares will not match.
     pub fn generate(&self) -> Result<(PublicKeySet, Option<SecretKeyShare>), Error> {
         let mut pk_commit = Poly::zero().commitment();
-        let mut opt_sk_val = self.our_idx.map(|_| Fr::zero());
+        let mut opt_sk_val = self.our_idx.map(|_| Scalar::zero());
         let is_complete = |part: &&ProposalState| part.is_complete(self.threshold);
         for part in self.parts.values().filter(is_complete) {
             pk_commit += part.commit.row(0);
@@ -597,10 +599,10 @@ impl<N: NodeIdT, PK: PublicKey> SyncKeyGen<N, PK> {
             .sec_key
             .decrypt(&values[our_idx as usize])
             .map_err(|_| AckFault::DecryptValue)?;
-        let val = bincode::deserialize::<FieldWrap<Fr>>(&ser_val)
+        let val = bincode::deserialize::<FieldWrap<Scalar>>(&ser_val)
             .map_err(|_| AckFault::DeserializeValue)?
             .into_inner();
-        if part.commit.evaluate(our_idx + 1, sender_idx + 1) != G1Affine::one().mul(val) {
+        if part.commit.evaluate(our_idx + 1, sender_idx + 1) != G1Affine::generator().mul(val) {
             return Err(AckFault::ValueCommitment);
         }
         part.values.insert(sender_idx + 1, val);
@@ -609,41 +611,41 @@ impl<N: NodeIdT, PK: PublicKey> SyncKeyGen<N, PK> {
 }
 
 /// An error in an `Ack` message sent by a faulty node.
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Fail)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Error)]
 pub enum AckFault {
     /// The number of values differs from the number of nodes.
-    #[fail(display = "The number of values differs from the number of nodes")]
+    #[error("The number of values differs from the number of nodes")]
     ValueCount,
     /// No corresponding Part received.
-    #[fail(display = "No corresponding Part received")]
+    #[error("No corresponding Part received")]
     MissingPart,
     /// Value decryption failed.
-    #[fail(display = "Value decryption failed")]
+    #[error("Value decryption failed")]
     DecryptValue,
     /// Value deserialization failed.
-    #[fail(display = "Value deserialization failed")]
+    #[error("Value deserialization failed")]
     DeserializeValue,
     /// Value doesn't match the commitment.
-    #[fail(display = "Value doesn't match the commitment")]
+    #[error("Value doesn't match the commitment")]
     ValueCommitment,
 }
 
 /// An error in a `Part` message sent by a faulty node.
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Fail)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Error)]
 pub enum PartFault {
     /// The number of rows differs from the number of nodes.
-    #[fail(display = "The number of rows differs from the number of nodes")]
+    #[error("The number of rows differs from the number of nodes")]
     RowCount,
     /// Received multiple different Part messages from the same sender.
-    #[fail(display = "Received multiple different Part messages from the same sender")]
+    #[error("Received multiple different Part messages from the same sender")]
     MultipleParts,
     /// Could not decrypt our row in the Part message.
-    #[fail(display = "Could not decrypt our row in the Part message")]
+    #[error("Could not decrypt our row in the Part message")]
     DecryptRow,
     /// Could not deserialize our row in the Part message.
-    #[fail(display = "Could not deserialize our row in the Part message")]
+    #[error("Could not decrypt our row in the Part message")]
     DeserializeRow,
     /// Row does not match the commitment.
-    #[fail(display = "Row does not match the commitment")]
+    #[error("Could not decrypt our row in the Part message")]
     RowCommitment,
 }

@@ -2,7 +2,6 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::marker::PhantomData;
-use std::mem::replace;
 use std::result;
 use std::sync::Arc;
 
@@ -149,7 +148,7 @@ impl<N> SubsetHandler<N> {
             Done => {
                 contributions = match self {
                     Incremental => vec![],
-                    AllAtEnd(cs) => replace(cs, vec![]),
+                    AllAtEnd(cs) => std::mem::take(cs),
                 };
                 is_done = true;
             }
@@ -253,7 +252,7 @@ where
                 self.process_subset(cs_step)
             }
             MessageContent::DecryptionShare { proposer_id, share } => {
-                if let Some(ref ids) = self.subset.accepted_ids() {
+                if let Some(ids) = self.subset.accepted_ids() {
                     if !ids.contains(&proposer_id) {
                         let fault_kind = FaultKind::UnexpectedDecryptionShare;
                         return Ok(Fault::new(sender_id.clone(), fault_kind).into());

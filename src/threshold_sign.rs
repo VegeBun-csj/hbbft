@@ -19,8 +19,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::{fmt, result};
 
-use crate::crypto::{self, hash_g2, Signature, SignatureShare, G2};
-use failure::Fail;
+use crate::crypto::{self, hash_g2, G2Projective, Signature, SignatureShare};
+use thiserror::Error;
+
 use log::debug;
 use rand::Rng;
 use rand_derive::Rand;
@@ -30,22 +31,22 @@ use crate::fault_log::{Fault, FaultLog};
 use crate::{ConsensusProtocol, NetworkInfo, NodeIdT, Target};
 
 /// A threshold signing error.
-#[derive(Clone, Eq, PartialEq, Debug, Fail)]
+#[derive(Clone, Eq, PartialEq, Debug, Error)]
 pub enum Error {
     /// Redundant input provided.
-    #[fail(display = "Redundant input provided")]
+    #[error("Redundant input provided")]
     MultipleMessagesToSign,
     /// Error combining and verifying signature shares.
-    #[fail(display = "Error combining and verifying signature shares: {}", _0)]
+    #[error("Error combining and verifying signature shares: {0}")]
     CombineAndVerifySigCrypto(crypto::error::Error),
     /// Unknown sender
-    #[fail(display = "Unknown sender")]
+    #[error("Unknown sender")]
     UnknownSender,
     /// Signature verification failed.
-    #[fail(display = "Signature verification failed")]
+    #[error("Signature verification failed")]
     VerificationFailed,
     /// Document hash is not set, cannot sign or verify signatures.
-    #[fail(display = "Document hash is not set, cannot sign or verify signatures")]
+    #[error("Document hash is not set, cannot sign or verify signatures")]
     DocumentHashIsNone,
 }
 
@@ -53,23 +54,21 @@ pub enum Error {
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// A threshold sign message fault
-#[derive(Clone, Debug, Fail, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum FaultKind {
     /// `ThresholdSign` (`Coin`) received a signature share from an unverified sender.
-    #[fail(
-        display = "`ThresholdSign` (`Coin`) received a signature share from an unverified sender."
-    )]
+    #[error("`ThresholdSign` (`Coin`) received a signature share from an unverified sender.")]
     UnverifiedSignatureShareSender,
     /// `HoneyBadger` received a signatures share for the random value even though it is disabled.
-    #[fail(
-        display = "`HoneyBadger` received a signatures share for the random value even though it
+    #[error(
+        "`HoneyBadger` received a signatures share for the random value even though it
                    is disabled."
     )]
     UnexpectedSignatureShare,
 }
 
 /// A threshold signing message, containing a signature share.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Rand)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Rand)]
 pub struct Message(pub SignatureShare);
 
 /// A threshold signing algorithm instance. On input, broadcasts our threshold signature share. Upon
@@ -79,7 +78,7 @@ pub struct Message(pub SignatureShare);
 pub struct ThresholdSign<N> {
     netinfo: Arc<NetworkInfo<N>>,
     /// The hash of the document to be signed.
-    doc_hash: Option<G2>,
+    doc_hash: Option<G2Projective>,
     /// All received threshold signature shares, together with the node index.
     received_shares: BTreeMap<N, (usize, SignatureShare)>,
     /// Whether we already sent our shares.
@@ -246,7 +245,7 @@ impl<N: NodeIdT> ThresholdSign<N> {
         }
     }
 
-    fn combine_and_verify_sig(&self, hash: G2) -> Result<Signature> {
+    fn combine_and_verify_sig(&self, hash: G2Projective) -> Result<Signature> {
         // Pass the indices of sender nodes to `combine_signatures`.
         let shares_itr = self
             .received_shares
